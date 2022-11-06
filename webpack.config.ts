@@ -14,10 +14,19 @@ const config: webpack.Configuration = {
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: '[name].[contenthash].js',
+        clean: true
     },
     plugins: [
-        new HtmlWebpackPlugin(),
-        new ModuleLogger(),
+        new HtmlWebpackPlugin({
+            template: './src/index.html',
+        }),
+        new ModuleLogger({
+            templatePath: path.resolve(__dirname, './src'),
+            pathToSave: path.resolve(__dirname, './unused.json'),
+            whitelist: [
+                /index\.html$/,
+            ],
+        }),
         new StatoscopePlugin({
             saveStatsTo: 'stats.json',
             saveOnlyStats: false,

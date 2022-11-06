@@ -1,54 +1,50 @@
-import { writeFileSync } from 'fs';
-import { Compiler } from 'webpack';
+import * as fs from "fs"
+import { Compiler } from "webpack"
 
-import { readDirectory } from "../readDirectory"
-
-const whiteList = [
-    /.*node_modules.*/,
-    /\.json$/,
-    /.*plugins.*/,
-    /\.config\.[tj]s$/,
-    /README\.md$/,
-    /\.git.*$/,
-    /\.nvmrc$/,
-    /\.prettierrc\.yaml$/,
-    /index\.html$/,
-    /readDirectory.ts/,
-    /.*LICENSE.txt/i,
-    /.*dist.*/
-]
+type Options = {
+    templatePath: string,
+    pathToSave: string
+    whitelist?: Array<RegExp>
+}
 
 class ModuleLogger {
-    wholeDirectoryFiles: Set<string> = new Set()
-    usedFiles: Set<string> = new Set()
+    private files: Set<string> = new Set()
+    private pathToSave: string
+    private whitelist: Array<RegExp>
+    constructor({ templatePath, pathToSave, whitelist }: Options) {
+        this.pathToSave = pathToSave
+        this.whitelist = whitelist
+        this.readDirectory(templatePath)
+    }
     apply(compiler: Compiler) {
-        compiler.hooks.beforeRun.tap(
-            "ReadDirectory",
-            () => this.wholeDirectoryFiles = new Set(readDirectory(whiteList))
-        )
-        compiler.hooks.normalModuleFactory.tap(
-            'ModuleLogger',
-            (normalModuleFactory) => {
-                normalModuleFactory.hooks.module.tap('ModuleLogger', (_module, _createData) => {
-                    if (!whiteList.some((re) => re.test(_createData.resource))) {
-                        this.usedFiles.add(_createData.resource)
-                    }
-                    return _module
-                })
+        compiler.hooks.afterDone.tap('ModuleLogger', (stats) => {
+            stats.compilation.modules.forEach(module => {
+                //@ts-ignore Чуваки на вебпаке типы не дописали?
+                const modulePath = module.resource
+                if (typeof modulePath === "string") {
+                    this.files.delete(modulePath)
+                }
+            })
+            this.saveUnusedFiles()
+        })
+    }
+    saveUnusedFiles() {
+        fs.writeFileSync(this.pathToSave, JSON.stringify(Array.from(this.files)))
+    }
+    readDirectory(path: string) {
+        const files = fs.readdirSync(path)
+        for (const file of files) {
+            const newPath = `${path}/${file}`
+            const isDirectory = fs.statSync(newPath).isDirectory()
+            if (isDirectory) {
+                this.readDirectory(newPath)
+            } else if(this.isNotInWhitelist(file)) {
+                this.files.add(newPath)
             }
-        )
-        compiler.hooks.done.tap(
-            'HelloWorld',
-            () => {
-                const unused: Array<string> = []
-                this.wholeDirectoryFiles.forEach((key) => {
-                    if (!this.usedFiles.has(key)) {
-                        unused.push(key)
-                    }
-                })
-                writeFileSync()
-            }
-        )
+        }
+    }
+    isNotInWhitelist(string: string) {
+        return !this.whitelist.some((r) => r.test(string))
     }
 }
 
