@@ -5,6 +5,7 @@
   "scripts": {
     "build": "npm run build_webpack && npm run validate",
     "build_webpack": "rm -rf ./dist && webpack --mode=production --node-env=production",
+    "windows": "webpack --mode=production --node-env=production",
     "validate": "node_modules/.bin/statoscope validate -i stats.json --config=./statoscope.config.js"
   },
   "author": "",
